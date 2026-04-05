@@ -350,7 +350,7 @@ function App() {
   }, [logoImage, qrBaseImage])
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_8%_5%,rgba(249,115,22,0.15),transparent_38%),radial-gradient(circle_at_92%_2%,rgba(14,165,233,0.16),transparent_30%),linear-gradient(180deg,#020617,#111827)] px-4 py-6 text-slate-100 sm:px-6 lg:px-10">
+    <main className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_8%_5%,rgba(249,115,22,0.15),transparent_38%),radial-gradient(circle_at_92%_2%,rgba(14,165,233,0.16),transparent_30%),linear-gradient(180deg,#020617,#111827)] px-4 py-6 text-slate-100 sm:px-6 lg:px-10">
       <div className="mx-auto grid w-full max-w-7xl gap-6">
         <section className="rounded-3xl border border-white/15 bg-white/10 p-6 shadow-2xl shadow-slate-950/40 backdrop-blur-md">
           <p className="inline-flex rounded-full border border-orange-300/40 bg-orange-300/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-orange-100">
@@ -366,7 +366,7 @@ function App() {
         </section>
 
         <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          <form className="space-y-5 rounded-3xl border border-white/15 bg-slate-900/60 p-5 shadow-2xl shadow-slate-950/50 backdrop-blur md:p-6">
+          <form className="min-w-0 space-y-5 rounded-3xl border border-white/15 bg-slate-900/60 p-5 shadow-2xl shadow-slate-950/50 backdrop-blur md:p-6">
             <header>
               <h2 className="text-2xl font-bold text-white">Profile details</h2>
               <p className="mt-1 text-sm text-slate-300">Add the information you want people to see after scanning.</p>
@@ -518,7 +518,7 @@ function App() {
             </section>
           </form>
 
-          <aside className="space-y-4 rounded-3xl border border-white/15 bg-slate-900/60 p-5 shadow-2xl shadow-slate-950/50 backdrop-blur md:p-6">
+          <aside className="min-w-0 space-y-4 rounded-3xl border border-white/15 bg-slate-900/60 p-5 shadow-2xl shadow-slate-950/50 backdrop-blur md:p-6">
             <header>
               <h2 className="text-2xl font-bold text-white">Live QR preview</h2>
               <p className="mt-1 text-sm text-slate-300">Scanning shows readable text lines, not vCard.</p>
@@ -555,7 +555,7 @@ function App() {
 
             <section className="space-y-2">
               <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-100">Encoded text</h3>
-              <pre className="max-h-72 overflow-auto rounded-2xl border border-white/10 bg-slate-950/65 p-4 text-sm leading-relaxed text-slate-200">{payload}</pre>
+              <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-2xl border border-white/10 bg-slate-950/65 p-4 text-sm leading-relaxed text-slate-200">{payload}</pre>
             </section>
 
             <section className="space-y-2">
