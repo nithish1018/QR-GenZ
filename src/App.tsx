@@ -48,16 +48,94 @@ const buildDetailRows = (
   return [...rows, ...customRows].filter((row) => row.value.length > 0)
 }
 
-const buildReadablePayload = (rows: DetailRow[]) => {
-  if (rows.length === 0) {
-    return 'Fill in the form to generate your QR code.'
+const escapeVCardValue = (value: string) =>
+  value
+    .replaceAll('\\', '\\\\')
+    .replaceAll('\r\n', '\n')
+    .replaceAll('\n', '\\n')
+    .replaceAll(',', '\\,')
+    .replaceAll(';', '\\;')
+
+const buildVCardName = (fullName: string) => {
+  const trimmedName = fullName.trim()
+
+  if (!trimmedName) {
+    return { familyName: '', givenName: '', additionalNames: '' }
   }
 
-  return [
-    'CONTACT DETAILS',
-    '----------------',
-    ...rows.map((row) => `${row.label}: ${row.value}`),
-  ].join('\n')
+  const parts = trimmedName.split(/\s+/).filter(Boolean)
+
+  if (parts.length === 1) {
+    return { familyName: '', givenName: parts[0], additionalNames: '' }
+  }
+
+  return {
+    familyName: parts.at(-1) ?? '',
+    givenName: parts[0],
+    additionalNames: parts.slice(1, -1).join(' '),
+  }
+}
+
+const buildVCardPayload = (
+  form: {
+    name: string
+    designation: string
+    email: string
+    location: string
+    phone: string
+    notes: string
+  },
+  extraFields: ExtraField[],
+) => {
+  const name = form.name.trim()
+  const designation = form.designation.trim()
+  const email = form.email.trim()
+  const location = form.location.trim()
+  const phone = form.phone.trim()
+  const notes = form.notes.trim()
+  const { familyName, givenName, additionalNames } = buildVCardName(name)
+
+  const lines = [
+    'BEGIN:VCARD',
+    'VERSION:3.0',
+    `FN:${escapeVCardValue(name || 'Contact')}`,
+    `N:${escapeVCardValue(familyName)};${escapeVCardValue(givenName)};${escapeVCardValue(additionalNames)};;`,
+  ]
+
+  if (designation) {
+    lines.push(`TITLE:${escapeVCardValue(designation)}`)
+  }
+
+  if (phone) {
+    lines.push(`TEL;TYPE=CELL:${escapeVCardValue(phone)}`)
+  }
+
+  if (email) {
+    lines.push(`EMAIL;TYPE=INTERNET:${escapeVCardValue(email)}`)
+  }
+
+  if (location) {
+    lines.push(`ADR;TYPE=HOME:;;${escapeVCardValue(location)};;;;`)
+    lines.push(`LABEL;TYPE=HOME:${escapeVCardValue(location)}`)
+  }
+
+  const customNotes = extraFields
+    .map((field) => ({
+      label: field.label.trim() || 'Custom',
+      value: field.value.trim(),
+    }))
+    .filter((field) => field.value.length > 0)
+    .map((field) => `${field.label}: ${field.value}`)
+
+  const noteLines = [notes, ...customNotes].filter(Boolean)
+
+  if (noteLines.length > 0) {
+    lines.push(`NOTE:${escapeVCardValue(noteLines.join('\n'))}`)
+  }
+
+  lines.push('END:VCARD')
+
+  return lines.join('\r\n')
 }
 
 const loadImage = (src: string) =>
@@ -163,7 +241,13 @@ function App() {
   const logoInputRef = useRef<HTMLInputElement | null>(null)
 
   const detailRows = useMemo(() => buildDetailRows(form, extraFields), [form, extraFields])
-  const payload = useMemo(() => buildReadablePayload(detailRows), [detailRows])
+  const payload = useMemo(
+    () =>
+      detailRows.length > 0
+        ? buildVCardPayload(form, extraFields)
+        : 'Fill in the form to generate your QR code.',
+    [detailRows.length, form, extraFields],
+  )
 
   const [qrBaseImage, setQrBaseImage] = useState('')
   const [qrImage, setQrImage] = useState('')
@@ -360,8 +444,8 @@ function App() {
             Share readable details in one scan
           </h1>
           <p className="mt-3 max-w-3xl text-base text-slate-200/90">
-            This QR now encodes plain readable text instead of vCard. Scanners will show
-            clean lines like Name, Email, Phone, Location, and your custom fields.
+            This QR now encodes vCard data so contact scanners can import details
+            directly into phone address books.
           </p>
         </section>
 
@@ -521,7 +605,7 @@ function App() {
           <aside className="min-w-0 space-y-4 rounded-3xl border border-white/15 bg-slate-900/60 p-5 shadow-2xl shadow-slate-950/50 backdrop-blur md:p-6">
             <header>
               <h2 className="text-2xl font-bold text-white">Live QR preview</h2>
-              <p className="mt-1 text-sm text-slate-300">Scanning shows readable text lines, not vCard.</p>
+              <p className="mt-1 text-sm text-slate-300">Scanning opens contact details as a vCard profile.</p>
             </header>
 
             <div className="mx-auto w-full max-w-xs rounded-3xl border border-white/15 bg-white/10 p-4">
@@ -554,7 +638,7 @@ function App() {
             </div>
 
             <section className="space-y-2">
-              <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-100">Encoded text</h3>
+              <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-100">Encoded vCard</h3>
               <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-2xl border border-white/10 bg-slate-950/65 p-4 text-sm leading-relaxed text-slate-200">{payload}</pre>
             </section>
 
