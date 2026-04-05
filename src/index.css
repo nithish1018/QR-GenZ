@@ -1,0 +1,21 @@
+@import "tailwindcss";
+@source "./**/*.{ts,tsx,js,jsx,html}";
+
+@layer base {
+    * {
+        box-sizing: border-box;
+    }
+
+    html,
+    body,
+    #root {
+        min-height: 100%;
+    }
+
+    body {
+        margin: 0;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        color: #e2e8f0;
+        background: #020617;
+    }
+}
