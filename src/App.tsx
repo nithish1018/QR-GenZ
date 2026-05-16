@@ -243,27 +243,22 @@ function App() {
   const logoInputRef = useRef<HTMLInputElement | null>(null)
 
   const detailRows = useMemo(() => buildDetailRows(form, extraFields), [form, extraFields])
-  const payload = useMemo(() => {
-    if (mode === 'text') {
-      const trimmed = rawText.trim()
-      if (trimmed) return trimmed
-
-      return (
+  const payload =
+    mode === 'text'
+      ? (rawText.trim() ||
         (detailRows.length > 0
           ? detailRows.map((r) => `${r.label}: ${r.value}`).join('\n')
-          : '') || 'Fill in the form to generate your QR code.'
-      )
-    }
-
-    return detailRows.length > 0
-      ? buildVCardPayload(form, extraFields)
-      : 'Fill in the form to generate your QR code.'
-  }, [mode, rawText, detailRows.length, form, extraFields])
+          : '')) || 'Fill in the form to generate your QR code.'
+      : detailRows.length > 0
+        ? buildVCardPayload(form, extraFields)
+        : 'Fill in the form to generate your QR code.'
 
   const [qrBaseImage, setQrBaseImage] = useState('')
   const [qrImage, setQrImage] = useState('')
   const [logoImage, setLogoImage] = useState('')
+  const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false)
   const detailsImage = useMemo(() => createDetailsImage(detailRows), [detailRows])
+  const isPayloadReady = mode === 'text' ? rawText.trim().length > 0 || detailRows.length > 0 : detailRows.length > 0
 
   const updateField = (
     key: keyof typeof form,
@@ -443,6 +438,74 @@ function App() {
       active = false
     }
   }, [logoImage, qrBaseImage])
+
+  const openMobilePreview = async () => {
+    if (!isPayloadReady) return
+    // Ensure qrImage is ready before opening preview
+    try {
+      if (!qrBaseImage) {
+        const imageUrl = await QRCode.toDataURL(payload, {
+          errorCorrectionLevel: 'H',
+          margin: 1,
+          width: 320,
+          color: { dark: '#0b1020', light: '#ffffff' },
+        })
+
+        setQrBaseImage(imageUrl)
+      }
+
+      if (!qrImage) {
+        if (logoImage) {
+          const [qr, logo] = await Promise.all([loadImage(qrBaseImage || await QRCode.toDataURL(payload)), loadImage(logoImage)])
+          const canvas = document.createElement('canvas')
+          canvas.width = qr.width
+          canvas.height = qr.height
+          const context = canvas.getContext('2d')
+
+          if (context) {
+            context.drawImage(qr, 0, 0)
+            const logoSize = Math.floor(canvas.width * 0.24)
+            const logoX = Math.floor((canvas.width - logoSize) / 2)
+            const logoY = Math.floor((canvas.height - logoSize) / 2)
+            const padding = Math.floor(logoSize * 0.12)
+            const radius = Math.floor(logoSize * 0.2)
+
+            context.fillStyle = '#ffffff'
+            context.beginPath()
+            context.moveTo(logoX + radius, logoY)
+            context.lineTo(logoX + logoSize - radius, logoY)
+            context.quadraticCurveTo(logoX + logoSize, logoY, logoX + logoSize, logoY + radius)
+            context.lineTo(logoX + logoSize, logoY + logoSize - radius)
+            context.quadraticCurveTo(
+              logoX + logoSize,
+              logoY + logoSize,
+              logoX + logoSize - radius,
+              logoY + logoSize,
+            )
+            context.lineTo(logoX + radius, logoY + logoSize)
+            context.quadraticCurveTo(logoX, logoY + logoSize, logoX, logoY + logoSize - radius)
+            context.lineTo(logoX, logoY + radius)
+            context.quadraticCurveTo(logoX, logoY, logoX + radius, logoY)
+            context.closePath()
+            context.fill()
+
+            context.drawImage(logo, logoX + padding, logoY + padding, logoSize - padding * 2, logoSize - padding * 2)
+
+            setQrImage(canvas.toDataURL('image/png'))
+          } else {
+            setQrImage(qrBaseImage)
+          }
+        } else {
+          // qrImage will be created by effect that listens to qrBaseImage; set a fallback
+          setQrImage(qrBaseImage)
+        }
+      }
+    } catch {
+      // ignore errors — effects handle fallbacks
+    }
+
+    setMobilePreviewOpen(true)
+  }
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_8%_5%,rgba(249,115,22,0.15),transparent_38%),radial-gradient(circle_at_92%_2%,rgba(14,165,233,0.16),transparent_30%),linear-gradient(180deg,#020617,#111827)] px-4 py-6 text-slate-100 sm:px-6 lg:px-10">
@@ -728,6 +791,88 @@ function App() {
           </aside>
         </section>
       </div>
+      {/* Mobile fixed generate bar */}
+      <div className="md:hidden fixed bottom-4 left-0 right-0 px-4">
+        <div className="mx-auto max-w-3xl">
+          <div className="rounded-2xl bg-slate-900/70 p-3 shadow-lg backdrop-blur">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex-1 text-sm text-slate-200">Ready to generate your QR?</div>
+              <button
+                type="button"
+                onClick={openMobilePreview}
+                disabled={!isPayloadReady}
+                aria-disabled={!isPayloadReady}
+                className={(isPayloadReady
+                  ? 'rounded-xl bg-gradient-to-r from-orange-500 to-cyan-400 px-4 py-2 text-sm font-bold text-slate-900 shadow-md'
+                  : 'rounded-xl bg-slate-700/40 px-4 py-2 text-sm font-bold text-slate-300 shadow-none cursor-not-allowed')}
+              >
+                Generate QR Code
+              </button>
+            </div>
+
+            {!isPayloadReady ? (
+              <div className="mt-2 text-xs text-slate-400">
+                {mode === 'text'
+                  ? 'Enter custom text or fill form fields to enable generation.'
+                  : 'Fill at least one field (name, email, phone, location, notes, or custom) to enable generation.'}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile preview full-screen overlay */}
+      {mobilePreviewOpen ? (
+        <div className="fixed inset-0 z-50 flex flex-col bg-slate-900/95 text-slate-100">
+          <div className="flex items-center justify-between p-4">
+            <button
+              type="button"
+              onClick={() => setMobilePreviewOpen(false)}
+              className="rounded-lg border border-white/10 px-3 py-2 text-sm text-slate-200"
+            >
+              Back
+            </button>
+            <div className="text-sm font-semibold">QR Preview</div>
+            <div />
+          </div>
+
+          <div className="flex-1 overflow-auto p-6">
+            <div className="mx-auto max-w-sm">
+              {qrImage ? (
+                <img src={qrImage} alt="Generated QR" className="w-full rounded-2xl bg-white p-4" />
+              ) : (
+                <div className="grid h-64 place-items-center rounded-2xl bg-slate-800/60 p-4 text-center text-sm text-slate-300">
+                  Generating QR…
+                </div>
+              )}
+
+              <div className="mt-4 grid gap-2">
+                <button
+                  type="button"
+                  disabled={!qrImage}
+                  onClick={() => qrImage && downloadDataUrl(qrImage, 'contact-qr.png')}
+                  className="rounded-xl bg-white/90 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Download QR
+                </button>
+                <button
+                  type="button"
+                  disabled={!detailsImage}
+                  onClick={() => downloadDataUrl(detailsImage, 'contact-details.png')}
+                  className="rounded-xl border border-white/25 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Download details image
+                </button>
+              </div>
+
+              <section className="mt-6">
+                <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-100">Encoded payload</h3>
+                <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-2xl border border-white/10 bg-slate-950/65 p-4 text-sm leading-relaxed text-slate-200">{payload}</pre>
+              </section>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   )
 }
