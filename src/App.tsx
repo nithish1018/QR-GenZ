@@ -234,6 +234,8 @@ function App() {
     phone: '',
     notes: '',
   })
+  const [mode, setMode] = useState<'vcard' | 'text'>('vcard')
+  const [rawText, setRawText] = useState('')
   const [extraFields, setExtraFields] = useState<ExtraField[]>([
     createExtraField(1),
   ])
@@ -241,13 +243,22 @@ function App() {
   const logoInputRef = useRef<HTMLInputElement | null>(null)
 
   const detailRows = useMemo(() => buildDetailRows(form, extraFields), [form, extraFields])
-  const payload = useMemo(
-    () =>
-      detailRows.length > 0
-        ? buildVCardPayload(form, extraFields)
-        : 'Fill in the form to generate your QR code.',
-    [detailRows.length, form, extraFields],
-  )
+  const payload = useMemo(() => {
+    if (mode === 'text') {
+      const trimmed = rawText.trim()
+      if (trimmed) return trimmed
+
+      return (
+        (detailRows.length > 0
+          ? detailRows.map((r) => `${r.label}: ${r.value}`).join('\n')
+          : '') || 'Fill in the form to generate your QR code.'
+      )
+    }
+
+    return detailRows.length > 0
+      ? buildVCardPayload(form, extraFields)
+      : 'Fill in the form to generate your QR code.'
+  }, [mode, rawText, detailRows.length, form, extraFields])
 
   const [qrBaseImage, setQrBaseImage] = useState('')
   const [qrImage, setQrImage] = useState('')
@@ -273,9 +284,9 @@ function App() {
       current.map((field) =>
         field.id === id
           ? {
-              ...field,
-              [key]: value,
-            }
+            ...field,
+            [key]: value,
+          }
           : field,
       ),
     )
@@ -444,8 +455,9 @@ function App() {
             Share readable details in one scan
           </h1>
           <p className="mt-3 max-w-3xl text-base text-slate-200/90">
-            This QR now encodes vCard data so contact scanners can import details
-            directly into phone address books.
+            {mode === 'vcard'
+              ? 'This QR now encodes vCard data so contact scanners can import details directly into phone address books.'
+              : 'This QR encodes plain text so scanners will show the raw text content.'}
           </p>
         </section>
 
@@ -455,6 +467,52 @@ function App() {
               <h2 className="text-2xl font-bold text-white">Profile details</h2>
               <p className="mt-1 text-sm text-slate-300">Add the information you want people to see after scanning.</p>
             </header>
+
+            <div className="mt-3 flex items-center gap-3">
+              <span className="text-sm font-medium text-slate-200">Mode</span>
+
+              <div role="tablist" aria-label="QR mode" className="rounded-xl bg-slate-900/50 p-1 flex items-center gap-3">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={mode === 'vcard'}
+                  aria-label="vCard mode"
+                  onClick={() => setMode('vcard')}
+                  title="Encodes contact details as a vCard so address books can import them."
+                  className={
+                    (mode === 'vcard'
+                      ? 'bg-gradient-to-r from-orange-500 to-cyan-400 text-slate-900 font-bold shadow-lg ring-1 ring-white/20'
+                      : 'text-slate-200 hover:bg-white/5') +
+                    ' rounded-lg px-4 py-2 transition flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-cyan-400'
+                  }
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                    <path d="M3 3h7v7H3V3zM14 3h7v7h-7V3zM3 14h7v7H3v-7zM14 14h7v7h-7v-7z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span className="text-sm">vCard</span>
+                </button>
+
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={mode === 'text'}
+                  aria-label="Text mode"
+                  onClick={() => setMode('text')}
+                  title="Encodes raw text; scanners will display the text content directly."
+                  className={
+                    (mode === 'text'
+                      ? 'bg-gradient-to-r from-orange-500 to-cyan-400 text-slate-900 font-bold shadow-lg ring-1 ring-white/20'
+                      : 'text-slate-200 hover:bg-white/5') +
+                    ' rounded-lg px-4 py-2 transition flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-cyan-400'
+                  }
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                    <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span className="text-sm">Text</span>
+                </button>
+              </div>
+            </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="space-y-2 text-sm font-medium text-slate-200">
@@ -519,6 +577,19 @@ function App() {
                 className="w-full rounded-xl border border-white/15 bg-slate-950/60 px-4 py-3 text-slate-100 placeholder:text-slate-400 outline-none ring-orange-300/40 transition focus:ring-2"
               />
             </label>
+
+            {mode === 'text' ? (
+              <label className="block space-y-2 text-sm font-medium text-slate-200">
+                <span>Custom text (used in Text mode)</span>
+                <textarea
+                  value={rawText}
+                  onChange={(e) => setRawText(e.target.value)}
+                  placeholder="Enter the text you want encoded in the QR code"
+                  rows={6}
+                  className="w-full rounded-xl border border-white/15 bg-slate-950/60 px-4 py-3 text-slate-100 placeholder:text-slate-400 outline-none ring-orange-300/40 transition focus:ring-2"
+                />
+              </label>
+            ) : null}
 
             <div className="rounded-2xl border border-cyan-200/30 bg-cyan-400/10 p-4">
               <div className="mb-3 flex items-center justify-between gap-4">
@@ -605,7 +676,9 @@ function App() {
           <aside className="min-w-0 space-y-4 rounded-3xl border border-white/15 bg-slate-900/60 p-5 shadow-2xl shadow-slate-950/50 backdrop-blur md:p-6">
             <header>
               <h2 className="text-2xl font-bold text-white">Live QR preview</h2>
-              <p className="mt-1 text-sm text-slate-300">Scanning opens contact details as a vCard profile.</p>
+              <p className="mt-1 text-sm text-slate-300">
+                {mode === 'vcard' ? 'Scanning opens contact details as a vCard profile.' : 'Scanning reveals the encoded text content.'}
+              </p>
             </header>
 
             <div className="mx-auto w-full max-w-xs rounded-3xl border border-white/15 bg-white/10 p-4">
@@ -638,7 +711,7 @@ function App() {
             </div>
 
             <section className="space-y-2">
-              <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-100">Encoded vCard</h3>
+              <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-100">Encoded payload</h3>
               <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-2xl border border-white/10 bg-slate-950/65 p-4 text-sm leading-relaxed text-slate-200">{payload}</pre>
             </section>
 
